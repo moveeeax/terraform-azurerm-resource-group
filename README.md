@@ -8,7 +8,7 @@ are deployed and managed, sharing a common lifecycle, region and tag set.
 
 ```hcl
 module "resource_group" {
-  source = "github.com/cybercapybara/terraform-azurerm-resource-group"
+  source = "github.com/moveeeax/terraform-azurerm-resource-group"
 
   name     = "prod-rg"
   location = "eastus"
