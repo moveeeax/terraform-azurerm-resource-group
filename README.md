@@ -8,7 +8,7 @@ are deployed and managed, sharing a common lifecycle, region and tag set.
 
 ```hcl
 module "resource_group" {
-  source = "github.com/moveeeax/terraform-azurerm-resource-group"
+  source = "github.com/moveeeax/terraform-azurerm-resource-group?ref=v1.0.0"
 
   name     = "prod-rg"
   location = "eastus"
@@ -31,7 +31,7 @@ on the group:
 
 ```hcl
 module "resource_group" {
-  source = "github.com/moveeeax/terraform-azurerm-resource-group"
+  source = "github.com/moveeeax/terraform-azurerm-resource-group?ref=v1.0.0"
 
   name     = "prod-rg"
   location = "eastus"
@@ -63,7 +63,10 @@ rather than being rejected by the API halfway through an apply.
 | Name      | Version  |
 |-----------|----------|
 | terraform | >= 1.5   |
-| azurerm   | >= 3.0   |
+| azurerm   | >= 3.0, < 6.0 |
+
+CI validates and tests the module against the 3.0.0 floor and the latest azurerm
+5.x release; 6.x is excluded until it has been tested.
 
 ## Inputs
 
