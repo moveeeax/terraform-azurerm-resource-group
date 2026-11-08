@@ -3,8 +3,10 @@ terraform {
 
   required_providers {
     azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 3.0, < 6.0"
+      source = "hashicorp/azurerm"
+      # `azurerm_role_assignment.principal_type` became settable in 3.87.0;
+      # before that it was computed only.
+      version = ">= 3.87.0, < 6.0"
     }
   }
 }

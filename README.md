@@ -52,6 +52,35 @@ deletion rather than an absolute barrier. Managing the lock outside Terraform,
 or adding a `prevent_destroy` lifecycle block in your root module, is the
 stronger option if that is what you need.
 
+## Role assignments
+
+`role_assignments` grants roles on the group itself, so who can touch the group
+is declared with the group. It defaults to `{}`. Keys are arbitrary but must be
+static (known at plan time); use names like `team_contributor`, not principal
+IDs computed elsewhere in the same apply.
+
+```hcl
+  role_assignments = {
+    platform_contributor = {
+      role_definition_id_or_name = "Contributor"
+      principal_id               = azuread_group.platform.object_id
+      principal_type             = "Group"
+    }
+    auditors_reader = {
+      role_definition_id_or_name = "Reader"
+      principal_id               = "00000000-0000-0000-0000-000000000000"
+    }
+  }
+```
+
+`role_definition_id_or_name` takes a role name (`"Reader"`) or a full role
+definition ID; values containing
+`/providers/Microsoft.Authorization/roleDefinitions/` are treated as IDs.
+Setting `principal_type` is recommended: without it Azure has to look the
+principal up, which can fail for a principal created moments earlier
+because of directory replication delay. `condition` adds an ABAC condition;
+`condition_version` then defaults to `"2.0"`.
+
 ## Validation
 
 `name` is checked against Azure's rules at plan time (1-90 characters; letters,
@@ -63,10 +92,12 @@ rather than being rejected by the API halfway through an apply.
 | Name      | Version  |
 |-----------|----------|
 | terraform | >= 1.5   |
-| azurerm   | >= 3.0, < 6.0 |
+| azurerm   | >= 3.87.0, < 6.0 |
 
-CI validates and tests the module against the 3.0.0 floor and the latest azurerm
-5.x release; 6.x is excluded until it has been tested.
+The floor is 3.87.0 because earlier releases treat
+`azurerm_role_assignment.principal_type` as computed only and reject a
+configured value. CI validates and tests the module against the 3.87.0 floor
+and the latest azurerm 5.x release; 6.x is excluded until it has been tested.
 
 ## Inputs
 
@@ -78,6 +109,7 @@ CI validates and tests the module against the 3.0.0 floor and the latest azurerm
 | `lock_level` | Management lock to apply: `CanNotDelete`, `ReadOnly`, or `null` for no lock.                    | `string`      | `null`  |    no    |
 | `lock_name`  | Name of the management lock. Defaults to `<name>-lock`. Ignored when `lock_level` is `null`.    | `string`      | `null`  |    no    |
 | `lock_notes` | Note recorded on the management lock. Ignored when `lock_level` is `null`.                      | `string`      | `null`  |    no    |
+| `role_assignments` | Role assignments on the group: `role_definition_id_or_name`, `principal_id`, optional `principal_type`, `description`, `condition`, `condition_version`. See [Role assignments](#role-assignments). | `map(object)` | `{}` | no |
 
 ## Outputs
 
@@ -87,6 +119,7 @@ CI validates and tests the module against the 3.0.0 floor and the latest azurerm
 | `name`     | Name of the resource group.                                                |
 | `location` | Azure region of the resource group.                                        |
 | `lock_id`  | ID of the management lock, or `null` when `lock_level` is `null`.          |
+| `role_assignment_ids` | Role assignment IDs, keyed like `role_assignments`.             |
 
 ## Development
 
