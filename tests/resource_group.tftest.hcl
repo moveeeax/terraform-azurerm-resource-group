@@ -5,7 +5,15 @@
 # file only — the module itself still supports >= 1.5, so versions.tf is
 # deliberately left alone.
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  # azurerm_role_assignment parses its scope as an ARM ID during plan, so the
+  # mocked group needs a well-formed ID instead of a random string.
+  mock_resource "azurerm_resource_group" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg"
+    }
+  }
+}
 
 variables {
   name     = "example-rg"
@@ -175,4 +183,122 @@ run "rejects_invalid_lock_level" {
   }
 
   expect_failures = [var.lock_level]
+}
+
+run "no_role_assignments_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(azurerm_role_assignment.this) == 0
+    error_message = "No role assignments should be created unless role_assignments is set."
+  }
+
+  assert {
+    condition     = output.role_assignment_ids == {}
+    error_message = "role_assignment_ids should be empty when no role assignments are declared."
+  }
+}
+
+run "role_assignments_by_name_and_id" {
+  variables {
+    role_assignments = {
+      team_contributor = {
+        role_definition_id_or_name = "Contributor"
+        principal_id               = "11111111-1111-1111-1111-111111111111"
+        principal_type             = "Group"
+      }
+      app_reader = {
+        role_definition_id_or_name = "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"
+        principal_id               = "22222222-2222-2222-2222-222222222222"
+        condition                  = "@Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals 'logs'"
+      }
+    }
+  }
+
+  assert {
+    condition     = length(azurerm_role_assignment.this) == 2
+    error_message = "One role assignment should be created per role_assignments entry."
+  }
+
+  assert {
+    condition     = azurerm_role_assignment.this["team_contributor"].scope == azurerm_resource_group.this.id
+    error_message = "Role assignments must be scoped to the resource group."
+  }
+
+  assert {
+    condition     = azurerm_role_assignment.this["team_contributor"].role_definition_name == "Contributor"
+    error_message = "A role name should be passed as role_definition_name."
+  }
+
+  assert {
+    condition     = azurerm_role_assignment.this["team_contributor"].principal_type == "Group"
+    error_message = "principal_type should be passed through unchanged."
+  }
+
+  assert {
+    condition     = azurerm_role_assignment.this["team_contributor"].condition == null
+    error_message = "No condition should be set unless one is given."
+  }
+
+  assert {
+    condition     = azurerm_role_assignment.this["app_reader"].role_definition_id == "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"
+    error_message = "A role definition ID should be passed as role_definition_id."
+  }
+
+  assert {
+    condition     = azurerm_role_assignment.this["app_reader"].condition_version == "2.0"
+    error_message = "condition_version should default to 2.0 when a condition is set."
+  }
+
+  assert {
+    condition     = keys(output.role_assignment_ids) == ["app_reader", "team_contributor"]
+    error_message = "role_assignment_ids should be keyed like the input map."
+  }
+}
+
+run "rejects_role_assignment_without_principal" {
+  command = plan
+
+  variables {
+    role_assignments = {
+      broken = {
+        role_definition_id_or_name = "Reader"
+        principal_id               = ""
+      }
+    }
+  }
+
+  expect_failures = [var.role_assignments]
+}
+
+run "rejects_invalid_principal_type" {
+  command = plan
+
+  variables {
+    role_assignments = {
+      broken = {
+        role_definition_id_or_name = "Reader"
+        principal_id               = "11111111-1111-1111-1111-111111111111"
+        principal_type             = "Robot"
+      }
+    }
+  }
+
+  expect_failures = [var.role_assignments]
+}
+
+run "rejects_condition_version_without_condition" {
+  command = plan
+
+  variables {
+    role_assignments = {
+      broken = {
+        role_definition_id_or_name = "Reader"
+        principal_id               = "11111111-1111-1111-1111-111111111111"
+        condition_version          = "2.0"
+      }
+    }
+  }
+
+  expect_failures = [var.role_assignments]
 }

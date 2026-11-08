@@ -55,3 +55,31 @@ variable "lock_notes" {
   type        = string
   default     = null
 }
+
+variable "role_assignments" {
+  description = "Role assignments to create on the resource group, keyed by an arbitrary static name. role_definition_id_or_name takes a role name such as \"Reader\" or a full role definition ID. principal_type (User, Group or ServicePrincipal) is optional but helps when the principal was created moments earlier, before directory replication caught up. condition_version defaults to \"2.0\" when condition is set."
+  type = map(object({
+    role_definition_id_or_name = string
+    principal_id               = string
+    principal_type             = optional(string)
+    description                = optional(string)
+    condition                  = optional(string)
+    condition_version          = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for ra in values(var.role_assignments) : length(trimspace(ra.role_definition_id_or_name)) > 0 && length(trimspace(ra.principal_id)) > 0])
+    error_message = "Each role_assignments entry needs a non-empty role_definition_id_or_name and principal_id."
+  }
+
+  validation {
+    condition     = alltrue([for ra in values(var.role_assignments) : ra.principal_type == null || contains(["User", "Group", "ServicePrincipal"], coalesce(ra.principal_type, "unset"))])
+    error_message = "Each role_assignments principal_type must be User, Group, ServicePrincipal or null."
+  }
+
+  validation {
+    condition     = alltrue([for ra in values(var.role_assignments) : ra.condition_version == null || (ra.condition != null && contains(["1.0", "2.0"], coalesce(ra.condition_version, "unset")))])
+    error_message = "A role_assignments condition_version may only be set together with condition, and must be \"1.0\" or \"2.0\"."
+  }
+}
